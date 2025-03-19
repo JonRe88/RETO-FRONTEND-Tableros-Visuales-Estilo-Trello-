@@ -1,162 +1,191 @@
-import React, { useState } from 'react';
-import { useSortable } from '@dnd-kit/sortable';
-import { CSS } from '@dnd-kit/utilities';
-import { List as ListType, Task as TaskType } from '../types';
-import { useBoardStore } from '../store/boards';
-import { MoreVertical, Plus, Trash2 } from 'lucide-react';
-import Task from './Task';
+import { useState } from 'react';
+import { Droppable, Draggable } from '@hello-pangea/dnd';
+import { Plus, Trash2, Edit2, Star, Archive } from 'lucide-react';
+import { List as ListType, Task } from '../types';
+import { useBoardStore } from '../store/boardStore';
+import toast from 'react-hot-toast';
 
 interface ListProps {
   boardId: string;
   list: ListType;
-  className?: string;
 }
 
 const taskColors = [
-  'bg-blue-100 dark:bg-blue-900/50 border-blue-200 dark:border-blue-700 hover:bg-blue-200 dark:hover:bg-blue-800/50',
-  'bg-purple-100 dark:bg-purple-900/50 border-purple-200 dark:border-purple-700 hover:bg-purple-200 dark:hover:bg-purple-800/50',
-  'bg-pink-100 dark:bg-pink-900/50 border-pink-200 dark:border-pink-700 hover:bg-pink-200 dark:hover:bg-pink-800/50',
-  'bg-yellow-100 dark:bg-yellow-900/50 border-yellow-200 dark:border-yellow-700 hover:bg-yellow-200 dark:hover:bg-yellow-800/50',
-  'bg-green-100 dark:bg-green-900/50 border-green-200 dark:border-green-700 hover:bg-green-200 dark:hover:bg-green-800/50',
-  'bg-orange-100 dark:bg-orange-900/50 border-orange-200 dark:border-orange-700 hover:bg-orange-200 dark:hover:bg-orange-800/50',
-  'bg-teal-100 dark:bg-teal-900/50 border-teal-200 dark:border-teal-700 hover:bg-teal-200 dark:hover:bg-teal-800/50',
-  'bg-red-100 dark:bg-red-900/50 border-red-200 dark:border-red-700 hover:bg-red-200 dark:hover:bg-red-800/50',
+  'bg-blue-100 border-blue-200 hover:bg-blue-200',
+  'bg-orange-300 border-orange-300 hover:bg-orange-200',
+  'bg-teal-300 border-teal-300 hover:bg-teal-200',
+  'bg-green-100 border-green-200 hover:bg-green-200',
+  'bg-purple-100 border-purple-200 hover:bg-purple-200',
+  'bg-pink-100 border-pink-200 hover:bg-pink-200',
+  'bg-yellow-100 border-yellow-200 hover:bg-yellow-200',
+  'bg-orange-100 border-orange-200 hover:bg-orange-200',
 ];
 
-export default function List({ boardId, list, className = '' }: ListProps) {
+export const List = ({ boardId, list }: ListProps) => {
   const [newTaskTitle, setNewTaskTitle] = useState('');
-  const [showNewTaskInput, setShowNewTaskInput] = useState(false);
-  const [showMenu, setShowMenu] = useState(false);
-  const { addTask, deleteList } = useBoardStore();
+  const [isEditing, setIsEditing] = useState(false);
+  const [editTitle, setEditTitle] = useState(list.title);
+  const { addTask, updateList, deleteList, updateTask, toggleListFavorite, toggleListArchive } = useBoardStore();
 
-  const {
-  
-    setNodeRef,
-    transform,
-    transition,
-  } = useSortable({
-    id: list.id,
-    data: {
-      type: 'list',
-      list,
-    },
-  });
-
-  const style = {
-    transform: CSS.Transform.toString(transform),
-    transition,
-  };
+  const completedTasks = list.tasks.filter((task) => task.completed).length;
+  const progress = list.tasks.length > 0 ? (completedTasks / list.tasks.length) * 100 : 0;
 
   const handleCreateTask = (e: React.FormEvent) => {
     e.preventDefault();
-    if (newTaskTitle.trim()) {
-      addTask(boardId, list.id, newTaskTitle.trim());
-      setNewTaskTitle('');
-      setShowNewTaskInput(false);
-    }
+    if (!newTaskTitle.trim()) return;
+
+    addTask(boardId, list.id, newTaskTitle.trim());
+    setNewTaskTitle('');
+    toast.success('Tarea creada exitosamente');
   };
 
-  const completedTasks = list.tasks.filter((task) => task.completed).length;
-  const progress = list.tasks.length > 0
-    ? (completedTasks / list.tasks.length) * 100
-    : 0;
+  const handleUpdateList = () => {
+    if (!editTitle.trim() || editTitle === list.title) {
+      setIsEditing(false);
+      return;
+    }
+
+    updateList(boardId, list.id, editTitle.trim());
+    setIsEditing(false);
+    toast.success('Lista actualizada');
+  };
+
+  const handleDeleteList = () => {
+    deleteList(boardId, list.id);
+    toast.success('Lista eliminada');
+  };
+
+  const toggleTaskComplete = (task: Task) => {
+    updateTask(boardId, list.id, task.id, { completed: !task.completed });
+  };
+
+  const handleToggleFavorite = () => {
+    toggleListFavorite(boardId, list.id);
+    toast.success(list.isFavorite ? 'Eliminado de favoritos' : 'Añadido a favoritos');
+  };
+
+  const handleToggleArchive = () => {
+    toggleListArchive(boardId, list.id);
+    toast.success(list.isArchived ? 'Lista restaurada' : 'Lista archivada');
+  };
 
   return (
-    <div
-      ref={setNodeRef}
-      style={style}
-      className={`flex-shrink-0 w-72 rounded-lg ${className}`}
-    >
-      <div className="p-4">
-        <div className="flex items-center justify-between mb-4">
-          <div className="flex items-center space-x-2">
-            <h3 className="text-lg font-medium text-gray-900 dark:text-white">{list.title}</h3>
-            <span className="text-sm text-gray-500 dark:text-gray-400">
-              ({list.tasks.length})
-            </span>
-          </div>
-          <div className="relative">
-            <button
-              onClick={() => setShowMenu(!showMenu)}
-              className="p-1 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700"
-            >
-              <MoreVertical className="h-5 w-5" />
-            </button>
-            {showMenu && (
-              <div className="absolute right-0 mt-2 w-48 bg-white dark:bg-gray-800 rounded-md shadow-lg z-10">
-                <button
-                  onClick={() => {
-                    deleteList(boardId, list.id);
-                    setShowMenu(false);
-                  }}
-                  className="w-full px-4 py-2 text-left text-sm text-red-600 dark:text-red-400 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center"
-                >
-                  <Trash2 className="h-4 w-4 mr-2" />
-                  Borrar Lista
-                </button>
-              </div>
-            )}
-          </div>
+    <div className="list-container">
+      <div className="flex justify-between items-center mb-4">
+        <div className="flex items-center gap-2">
+          {isEditing ? (
+            <input
+              type="text"
+              value={editTitle}
+              onChange={(e) => setEditTitle(e.target.value)}
+              onBlur={handleUpdateList}
+              onKeyPress={(e) => e.key === 'Enter' && handleUpdateList()}
+              className="px-2 py-1 border rounded dark:bg-gray-500 dark:border-gray-600 dark:text-white"
+              autoFocus
+            />
+          ) : (
+            <>
+              <h3 className="font-semibold dark:text-white">{list.title}</h3>
+              <button
+                onClick={() => setIsEditing(true)}
+                className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+              >
+                <Edit2 className="w-4 h-4" />
+              </button>
+            </>
+          )}
         </div>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={handleToggleFavorite}
+            className={`text-gray-500 hover:text-yellow-500 ${list.isFavorite ? 'text-yellow-500' : ''}`}
+          >
+            <Star className="w-4 h-4" />
+          </button>
+          <button
+            onClick={handleToggleArchive}
+            className={`text-gray-500 hover:text-purple-500 ${list.isArchived ? 'text-purple-500' : ''}`}
+          >
+            <Archive className="w-4 h-4" />
+          </button>
+          <button
+            onClick={handleDeleteList}
+            className="text-red-500 hover:text-red-700 p-1"
+          >
+            <Trash2 className="w-4 h-4" />
+          </button>
+        </div>
+      </div>
 
-        {/* Progress Bar */}
-        <div className="h-1 bg-gray-200 dark:bg-gray-700 rounded-full mb-4">
+      <div className="mb-4">
+        <div className="h-2 bg-gray-200 dark:bg-gray-600 rounded-full">
           <div
-            className="h-1 bg-green-500 dark:bg-green-400 rounded-full"
+            className="h-2 bg-green-500 rounded-full transition-all"
             style={{ width: `${progress}%` }}
           />
         </div>
-
-        {/* Tasks */}
-        <div className="space-y-2 mb-4">
-          {list.tasks.map((task: TaskType, index: number) => (
-            <Task
-              key={task.id}
-              task={task}
-              listId={list.id}
-              boardId={boardId}
-              className={taskColors[index % taskColors.length]}
-            />
-          ))}
+        <div className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+          {completedTasks} de {list.tasks.length} tareas completadas
         </div>
-
-        {/* Add Task */}
-        {showNewTaskInput ? (
-          <form onSubmit={handleCreateTask}>
-            <input
-              type="text"
-              value={newTaskTitle}
-              onChange={(e) => setNewTaskTitle(e.target.value)}
-              placeholder="Ingresa Nombre de Tarea"
-              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:focus:ring-indigo-400 dark:bg-gray-700 dark:text-white"
-              autoFocus
-            />
-            <div className="mt-2 flex justify-end space-x-2">
-              <button
-                type="button"
-                onClick={() => setShowNewTaskInput(false)}
-                className="px-3 py-1 text-sm text-gray-600 dark:text-gray-300 hover:text-gray-800 dark:hover:text-white"
-              >
-                Cancelar
-              </button>
-              <button
-                type="submit"
-                className="px-3 py-1 text-sm bg-indigo-600 text-white rounded-md hover:bg-indigo-700"
-              >
-                Agregar
-              </button>
-            </div>
-          </form>
-        ) : (
-          <button
-            onClick={() => setShowNewTaskInput(true)}
-            className="w-full py-2 flex items-center justify-center text-gray-600 dark:text-gray-300 hover:text-gray-800 dark:hover:text-white hover:bg-gray-200 dark:hover:bg-gray-700 rounded-md"
-          >
-            <Plus className="h-4 w-4 mr-2" />
-            Agregar Tarea
-          </button>
-        )}
       </div>
+
+      <form onSubmit={handleCreateTask} className="mb-4">
+        <div className="flex gap-2">
+          <input
+            type="text"
+            value={newTaskTitle}
+            onChange={(e) => setNewTaskTitle(e.target.value)}
+            placeholder="Nueva tarea..."
+            className="flex-1 px-3 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+          />
+          <button
+            type="submit"
+            className="bg-indigo-300 text-white px-3 py-2 rounded-lg hover:bg-blue-700"
+          >
+            <Plus className="w-4 h-4" />
+          </button>
+        </div>
+      </form>
+
+      <Droppable droppableId={list.id}>
+        {(provided) => (
+          <div
+            ref={provided.innerRef}
+            {...provided.droppableProps}
+            className="space-y-2"
+          >
+            {list.tasks.map((task, index) => (
+              <Draggable key={task.id} draggableId={task.id} index={index}>
+                {(provided) => (
+                  <div
+                    ref={provided.innerRef}
+                    {...provided.draggableProps}
+                    {...provided.dragHandleProps}
+                    className={`${
+                      taskColors[index % taskColors.length]
+                    } border rounded-lg p-3 shadow-sm transition-all ${
+                      task.completed ? 'opacity-75' : ''
+                    }`}
+                  >
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        checked={task.completed}
+                        onChange={() => toggleTaskComplete(task)}
+                        className="rounded border-gray-300 text-blue-600 focus:ring-blue-800 dark:border-gray-600"
+                      />
+                      <span className={`flex-1 ${task.completed ? 'line-through text-gray-500' : 'text-gray-700'}`}>
+                        {task.title}
+                      </span>
+                    </div>
+                  </div>
+                )}
+              </Draggable>
+            ))}
+            {provided.placeholder}
+          </div>
+        )}
+      </Droppable>
     </div>
   );
-}
+};
